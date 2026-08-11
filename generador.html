@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Generador de Documentos - Folio / QR / Sello</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<style>
+  body{font-family:system-ui,Arial,sans-serif;max-width:640px;margin:30px auto;padding:0 16px;color:#222}
+  h1{font-size:20px}
+  #login, #app{display:none}
+  input,button{font-size:15px;padding:8px;margin:4px 0}
+  input[type=text],input[type=email],input[type=password],input[type=date]{width:100%;box-sizing:border-box}
+  .campo-row{display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap}
+  .campo-row input{flex:1;min-width:100px}
+  .campo-row select{flex:1;min-width:140px;font-size:14px}
+  .campo-row button{flex:0 0 auto}
+  button{cursor:pointer}
+  #generarBtn{background:#1a73e8;color:#fff;border:none;border-radius:4px;padding:10px 16px;font-weight:bold}
+  #resultado{margin-top:20px;padding:16px;border:1px solid #ddd;border-radius:8px;display:none}
+  #resultado img{display:block;margin:10px 0}
+  .mono{font-family:monospace;word-break:break-all;background:#f5f5f5;padding:6px;border-radius:4px}
+  #error{color:#c00}
+</style>
+</head>
+<body>
+
+<h1>Generador de documentos</h1>
+
+<!-- ===== LOGIN ===== -->
+<div id="login">
+  <p>Inicia sesión para generar documentos.</p>
+  <input type="email" id="loginEmail" placeholder="correo">
+  <input type="password" id="loginPass" placeholder="contraseña">
+  <button onclick="iniciarSesion()">Entrar</button>
+  <p id="error"></p>
+</div>
+
+<!-- ===== APP ===== -->
+<div id="app">
+  <p>Sesión: <span id="usuarioActual"></span> — <button onclick="cerrarSesion()">Cerrar sesión</button></p>
+
+  <h2>Título del documento</h2>
+  <input type="text" id="tituloDocumento" placeholder="Ej. Certificado de terminación de estudios">
+
+  <h2>Campos del documento</h2>
+  <div id="camposContainer"></div>
+  <button onclick="agregarCampo()">+ Agregar campo</button>
+
+  <br><br>
+  <button id="generarBtn" onclick="generarDocumento()">Generar folio, sello y QR</button>
+
+  <div id="resultado">
+    <p><b>Folio:</b> <span id="outFolio" class="mono"></span></p>
+    <p><b>Sello digital:</b> <span id="outSello" class="mono"></span></p>
+    <p><b>Fecha y hora de timbrado:</b> <span id="outFecha" class="mono"></span></p>
+    <img id="outQR" width="220" height="220">
+    <a id="outDescargarQR" download="qr.png" style="display:inline-block;margin:6px 0 10px;padding:8px 14px;background:#1a73e8;color:#fff;border-radius:4px;text-decoration:none;font-weight:bold">Descargar QR</a>
+    <p><b>URL de validación:</b> <a id="outURL" class="mono" target="_blank"></a></p>
+  </div>
+</div>
+
+<!-- ===== FIREBASE ===== -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import {
+    getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut
+  } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+  import {
+    getDatabase, ref, set
+  } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
+
+  // ⚠️ Reemplaza esto con la configuración real de TU proyecto de Firebase
+  // (Firebase console > Configuración del proyecto > tus apps > SDK config)
+  const firebaseConfig = {
+    apiKey: "AIzaSyCrLDSRloFeTdoJFT8hahdbMfCP468NDIw",
+  authDomain: "certificadoelectronico-89f1e.firebaseapp.com",
+  databaseURL: "https://certificadoelectronico-89f1e-default-rtdb.firebaseio.com",
+  projectId: "certificadoelectronico-89f1e",
+  storageBucket: "certificadoelectronico-89f1e.firebasestorage.app",
+  messagingSenderId: "1071784580481",
+  appId: "1:1071784580481:web:4d53c299ef597acf6f0480"
+};
+  
+
+  // ⚠️ Cambia esto por la URL real donde subas validar.html (GitHub Pages)
+  const URL_VALIDACION = "https://sigedvalidacion.github.io/SigedCertificado-Validacion/validar.html";
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getDatabase(app);
+
+  window.iniciarSesion = async function () {
+    const email = document.getElementById('loginEmail').value;
+    const pass = document.getElementById('loginPass').value;
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+    } catch (e) {
+      document.getElementById('error').textContent = "No se pudo iniciar sesión: " + e.message;
+    }
+  };
+
+  window.cerrarSesion = function () { signOut(auth); };
+
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      document.getElementById('login').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      document.getElementById('usuarioActual').textContent = user.email;
+    } else {
+      document.getElementById('login').style.display = 'block';
+      document.getElementById('app').style.display = 'none';
+    }
+  });
+
+  // ---- Campos dinámicos ----
+  const CATEGORIAS = ["Información del alumno", "Información de la institución", "Detalles académicos", "Otro"];
+
+  const camposIniciales = [
+    ["Nombre", "", "Información del alumno"],
+    ["CURP", "", "Información del alumno"],
+    ["Escuela", "", "Información de la institución"],
+    ["CCT", "", "Información de la institución"],
+    ["Plan de estudios", "", "Detalles académicos"],
+    ["Promedio", "", "Detalles académicos"],
+    ["Periodo de estudios", "", "Detalles académicos"],
+    ["Estatus", "", "Detalles académicos"],
+    ["Lugar", "", "Otro"],
+    ["Fecha de expedición", "", "Otro"]
+  ];
+
+  function agregarCampo(nombre = "", valor = "", categoria = "Otro") {
+    const cont = document.getElementById('camposContainer');
+    const row = document.createElement('div');
+    row.className = 'campo-row';
+    const opciones = CATEGORIAS.map(c => `<option value="${c}" ${c === categoria ? 'selected' : ''}>${c}</option>`).join('');
+    row.innerHTML = `
+      <input type="text" placeholder="Nombre del campo" class="campoNombre" value="${nombre}">
+      <input type="text" placeholder="Valor" class="campoValor" value="${valor}">
+      <select class="campoCategoria">${opciones}</select>
+      <button onclick="this.parentElement.remove()">✕</button>`;
+    cont.appendChild(row);
+  }
+  window.agregarCampo = agregarCampo;
+  camposIniciales.forEach(([n, v, c]) => agregarCampo(n, v, c));
+
+  // ---- Formato de fecha tipo "21-07-2026 08:30:44 pm" ----
+  function formatearTimbrado(fechaISO) {
+    const d = new Date(fechaISO);
+    const pad = n => String(n).padStart(2, "0");
+    let horas = d.getHours();
+    const ampm = horas >= 12 ? "pm" : "am";
+    horas = horas % 12 || 12;
+    return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(horas)}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${ampm}`;
+  }
+
+  // ---- Folio ----
+  function bloqueAleatorio(longitud) {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let out = "";
+    const random = new Uint32Array(longitud);
+    crypto.getRandomValues(random);
+    for (let i = 0; i < longitud; i++) out += chars[random[i] % chars.length];
+    return out;
+  }
+  function generarFolio() {
+    return [8, 4, 4, 4, 12].map(bloqueAleatorio).join("-");
+  }
+
+  // ---- Sello digital: 256 caracteres reales (dos SHA-512 encadenados), verificable ----
+  async function sha512hex(texto) {
+    const buffer = await crypto.subtle.digest("SHA-512", new TextEncoder().encode(texto));
+    return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, "0")).join("");
+  }
+  async function generarSello(folio, titulo, campos) {
+    const ordenados = [...campos].sort((a, b) => a.nombre.localeCompare(b.nombre));
+    const cadena = folio + "|" + titulo + "|" + ordenados.map(c => `${c.nombre}=${c.valor}`).join("|");
+    const parte1 = await sha512hex(cadena);
+    const parte2 = await sha512hex(parte1 + "|" + folio);
+    return parte1 + parte2; // 256 caracteres
+  }
+
+  window.generarDocumento = async function () {
+    const titulo = document.getElementById('tituloDocumento').value.trim() || "Documento";
+    const filas = document.querySelectorAll('.campo-row');
+    const campos = [];
+    filas.forEach(row => {
+      const nombre = row.querySelector('.campoNombre').value.trim();
+      const valor = row.querySelector('.campoValor').value.trim();
+      const categoria = row.querySelector('.campoCategoria').value;
+      if (nombre) campos.push({ nombre, valor, categoria });
+    });
+    if (campos.length === 0) {
+      alert("Agrega al menos un campo.");
+      return;
+    }
+
+    // Validación de formato (solo estructura, no verifica existencia real)
+    const regexCURP = /^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/;
+    const regexRFC = /^[A-Z&Ñ]{3,4}\d{6}[A-Z0-9]{3}$/;
+    for (const c of campos) {
+      const nombre = c.nombre.toUpperCase();
+      const valor = c.valor.toUpperCase();
+      if (nombre.includes("CURP") && !regexCURP.test(valor)) {
+        alert(`El campo "${c.nombre}" no tiene el formato válido de un CURP (18 caracteres, ej. AAAA000000HAAAAA00).`);
+        return;
+      }
+      if (nombre.includes("RFC") && !regexRFC.test(valor)) {
+        alert(`El campo "${c.nombre}" no tiene el formato válido de un RFC (12 o 13 caracteres, ej. AAAA000000AAA).`);
+        return;
+      }
+    }
+
+    const folio = generarFolio();
+    const sello = await generarSello(folio, titulo, campos);
+    const fechaCreacion = new Date().toISOString();
+
+    try {
+      await set(ref(db, `documentos/${folio}`), {
+        folio, titulo, campos, sello, fechaCreacion
+      });
+    } catch (e) {
+      alert("Error al guardar en la base de datos: " + e.message);
+      return;
+    }
+
+    const urlValidacion = `${URL_VALIDACION}?folio=${encodeURIComponent(folio)}`;
+
+    document.getElementById('outFolio').textContent = folio;
+    document.getElementById('outSello').textContent = sello;
+    document.getElementById('outFecha').textContent = formatearTimbrado(fechaCreacion);
+    document.getElementById('outURL').textContent = urlValidacion;
+    document.getElementById('outURL').href = urlValidacion;
+    document.getElementById('resultado').style.display = 'block';
+
+    generarImagenQR(urlValidacion);
+  };
+
+  function generarImagenQR(texto) {
+    const img = document.getElementById('outQR');
+    if (typeof QRCode === 'undefined') {
+      // La librería no cargó de la fuente principal: intenta una fuente alterna
+      const script = document.createElement('script');
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+      script.onload = () => generarImagenQRAlterna(texto);
+      script.onerror = () => { img.replaceWith(Object.assign(document.createElement('p'), {textContent: 'No se pudo cargar el generador de QR. Revisa tu conexión a internet.'})); };
+      document.head.appendChild(script);
+      return;
+    }
+    QRCode.toDataURL(texto, { width: 220 }, (err, url) => {
+      if (err) {
+        img.replaceWith(Object.assign(document.createElement('p'), {textContent: 'Error al generar el QR: ' + err.message}));
+      } else {
+        img.src = url;
+        const enlace = document.getElementById('outDescargarQR');
+        enlace.href = url;
+        enlace.download = `qr-${document.getElementById('outFolio').textContent}.png`;
+      }
+    });
+  }
+
+  function generarImagenQRAlterna(texto) {
+    // qrcodejs (davidshimjs) genera un <canvas>/<img> dentro de un div, no una URL directa
+    const cont = document.createElement('div');
+    document.getElementById('outQR').replaceWith(cont);
+    new QRCode(cont, { text: texto, width: 220, height: 220 });
+    setTimeout(() => {
+      const canvas = cont.querySelector('canvas');
+      if (canvas) {
+        const enlace = document.getElementById('outDescargarQR');
+        enlace.href = canvas.toDataURL('image/png');
+        enlace.download = `qr-${document.getElementById('outFolio').textContent}.png`;
+      }
+    }, 300);
+  }
+</script>
+</body>
+  </html>
