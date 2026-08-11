@@ -34,20 +34,10 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.0/auth.js";
+import { firebaseConfig } from "./config.js";
 
-        // PEGA TUS CREDENCIALES DE FIREBASE AQUÍ
-        const firebaseConfig = {
-  apiKey: "AIzaSyCrLDSRloFeTdoJFT8hahdbMfCP468NDIw",
-  authDomain: "certificadoelectronico-89f1e.firebaseapp.com",
-  projectId: "certificadoelectronico-89f1e",
-  storageBucket: "certificadoelectronico-89f1e.firebasestorage.app",
-  messagingSenderId: "1071784580481",
-  appId: "1:1071784580481:web:4d53c299ef597acf6f0480"
-        };
+const app = initializeApp(firebaseConfig);
         
-      const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
 
         document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
