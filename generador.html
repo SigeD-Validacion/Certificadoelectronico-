@@ -1,253 +1,210 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<title>Generador de Documentos - Folio / QR / Sello</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-<style>
-  body{font-family:system-ui,Arial,sans-serif;max-width:640px;margin:30px auto;padding:0 16px;color:#222}
-  h1{font-size:20px}
-  #login, #app{display:none}
-  input,button{font-size:15px;padding:8px;margin:4px 0}
-  input[type=text],input[type=email],input[type=password],input[type=date]{width:100%;box-sizing:border-box}
-  .campo-row{display:flex;gap:6px;margin-bottom:6px}
-  .campo-row input{flex:1}
-  .campo-row button{flex:0 0 auto}
-  button{cursor:pointer}
-  #generarBtn{background:#1a73e8;color:#fff;border:none;border-radius:4px;padding:10px 16px;font-weight:bold}
-  #resultado{margin-top:20px;padding:16px;border:1px solid #ddd;border-radius:8px;display:none}
-  #resultado img{display:block;margin:10px 0}
-  .mono{font-family:monospace;word-break:break-all;background:#f5f5f5;padding:6px;border-radius:4px}
-  #error{color:#c00}
-</style>
+    <meta charset="UTF-8">
+    <title>Generador de Documentos - SIGED</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background: #f4f4f4; color: #333; padding: 20px; margin: 0; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #6b1426; font-size: 20px; border-bottom: 2px solid #6b1426; padding-bottom: 10px; margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; color: #333; font-size: 13px; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .campo-row { display: flex; gap: 10px; margin-bottom: 10px; }
+        .btn { background: #6b1426; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn:hover { background: #520f1d; }
+        .btn-danger { background: #d9534f; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+        .btn-success { background: #5cb85c; width: 100%; padding: 12px; font-size: 15px; margin-top: 20px; }
+        .btn-success:hover { background: #4cae4c; }
+        .resultado-box { margin-top: 30px; background: #f9f9f9; padding: 20px; border: 1px solid #ddd; border-radius: 4px; text-align: center; }
+        .sello-box { background: white; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; word-break: break-all; text-align: left; font-family: monospace; max-height: 80px; overflow-y: auto; }
+        .hidden { display: none; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    </style>
 </head>
 <body>
+    <div class="container">
+        <div class="top-bar">
+            <h1>Panel Generador de Documentos Únicos</h1>
+            <button class="btn" id="logout-btn" style="background: #333; font-size: 12px;">Cerrar Sesión</button>
+        </div>
 
-<h1>Generador de documentos</h1>
+        <p style="font-size: 13px; color: #666; margin-bottom: 20px;">Personaliza los nombres de los campos según tus necesidades. Al generar, el sistema creará un folio único, fecha de timbrado y sello digital oficial.</p>
 
-<!-- ===== LOGIN ===== -->
-<div id="login">
-  <p>Inicia sesión para generar documentos.</p>
-  <input type="email" id="loginEmail" placeholder="correo">
-  <input type="password" id="loginPass" placeholder="contraseña">
-  <button onclick="iniciarSesion()">Entrar</button>
-  <p id="error"></p>
-</div>
+        <h3>1. Configurar Campos del Formulario</h3>
+        <div id="lista-campos-editor">
+            <div class="campo-row">
+                <input type="text" value="Nombre y apellidos" oninput="actualizarFormularioDatos()">
+                <button class="btn-danger" onclick="this.parentElement.remove(); actualizarFormularioDatos();">X</button>
+            </div>
+            <div class="campo-row">
+                <input type="text" value="Matrícula" oninput="actualizarFormularioDatos()">
+                <button class="btn-danger" onclick="this.parentElement.remove(); actualizarFormularioDatos();">X</button>
+            </div>
+            <div class="campo-row">
+                <input type="text" value="Institución educativa emisora" oninput="actualizarFormularioDatos()">
+                <button class="btn-danger" onclick="this.parentElement.remove(); actualizarFormularioDatos();">X</button>
+            </div>
+            <div class="campo-row">
+                <input type="text" value="Promedio" oninput="actualizarFormularioDatos()">
+                <button class="btn-danger" onclick="this.parentElement.remove(); actualizarFormularioDatos();">X</button>
+            </div>
+        </div>
+        <button class="btn" style="background: #333; margin-top: 5px; font-size: 12px;" onclick="agregarNuevoCampo()">+ Agregar Campo Nuevo</button>
 
-<!-- ===== APP ===== -->
-<div id="app">
-  <p>Sesión: <span id="usuarioActual"></span> — <button onclick="cerrarSesion()">Cerrar sesión</button></p>
+        <h3 style="margin-top: 25px;">2. Rellenar Datos</h3>
+        <div id="contenedor-inputs-dinamicos"></div>
 
-  <h2>Campos del documento</h2>
-  <div id="camposContainer"></div>
-  <button onclick="agregarCampo()">+ Agregar campo</button>
+        <button class="btn btn-success" onclick="guardarYGenerarRegistro()">Generar Registro, QR, Sello y Folio</button>
 
-  <br><br>
-  <button id="generarBtn" onclick="generarDocumento()">Generar folio, sello y QR</button>
+        <!-- RESULTADO -->
+        <div id="resultado-gen" class="resultado-box hidden">
+            <h3 style="color: #6b1426; margin-bottom: 15px;">¡Documento Generado y Guardado en Firebase!</h3>
+            <div style="display: flex; gap: 20px; align-items: center; text-align: left; margin-bottom: 15px;">
+                <div id="qr-img-render" style="background: white; padding: 10px; border: 1px solid #ccc; text-align: center;"></div>
+                <div style="font-size: 13px;">
+                    <p><strong>Folio Único:</strong><br><span id="lbl-folio" style="font-family: monospace; font-weight: bold; color: #6b1426;"></span></p><br>
+                    <p><strong>Fecha y Hora de Timbrado:</strong><br><span id="lbl-fecha"></span></p>
+                </div>
+            </div>
+            <div style="text-align: left; margin-bottom: 15px; font-size: 13px;">
+                <strong>Sello Digital (Longitud Oficial):</strong>
+                <div id="lbl-sello" class="sello-box"></div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn" style="background: #337ab7; flex: 1;" onclick="descargarQR()">Descargar QR (PNG)</button>
+                <button class="btn" style="background: #337ab7; flex: 1;" onclick="copiarPortapapeles()">Copiar Datos al Portapapeles</button>
+            </div>
+        </div>
+    </div>
 
-  <div id="resultado">
-    <p><b>Folio:</b> <span id="outFolio" class="mono"></span></p>
-    <p><b>Sello digital:</b> <span id="outSello" class="mono"></span></p>
-    <p><b>Fecha y hora de timbrado:</b> <span id="outFecha" class="mono"></span></p>
-    <img id="outQR" width="220" height="220">
-    <a id="outDescargarQR" download="qr.png" style="display:inline-block;margin:6px 0 10px;padding:8px 14px;background:#1a73e8;color:#fff;border-radius:4px;text-decoration:none;font-weight:bold">Descargar QR</a>
-    <p><b>URL de validación:</b> <a id="outURL" class="mono" target="_blank"></a></p>
-  </div>
-</div>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/auth.js";
+        import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.0/firestore.js";
 
-<!-- ===== FIREBASE ===== -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-  import {
-    getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut
-  } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
-  import {
-    getDatabase, ref, set
-  } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
-
-  // ⚠️ Reemplaza esto con la configuración real de TU proyecto de Firebase
-  // (Firebase console > Configuración del proyecto > tus apps > SDK config)
-  const firebaseConfig = {
-     apiKey: "AIzaSyCrLDSRloFeTdoJFT8hahdbMfCP468NDIw",
+        // PEGA TUS CREDENCIALES DE FIREBASE AQUÍ
+        const firebaseConfig = {
+          apiKey: "AIzaSyCrLDSRloFeTdoJFT8hahdbMfCP468NDIw",
   authDomain: "certificadoelectronico-89f1e.firebaseapp.com",
   projectId: "certificadoelectronico-89f1e",
   storageBucket: "certificadoelectronico-89f1e.firebasestorage.app",
   messagingSenderId: "1071784580481",
   appId: "1:1071784580481:web:4d53c299ef597acf6f0480"
-};
+        };
 
-  // ⚠️ Cambia esto por la URL real donde subas validar.html (GitHub Pages)
-  const URL_VALIDACION = "https://siged-validacion.github.io/Certificadoelectronico-/";
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
 
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getDatabase(app);
+        // Proteger la página: Si no ha iniciado sesión, redirigir al login
+        onAuthStateChanged(auth, (user) => {
+            if (!user) {
+                window.location.href = 'login.html';
+            }
+        });
 
-  window.iniciarSesion = async function () {
-    const email = document.getElementById('loginEmail').value;
-    const pass = document.getElementById('loginPass').value;
-    try {
-      await signInWithEmailAndPassword(auth, email, pass);
-    } catch (e) {
-      document.getElementById('error').textContent = "No se pudo iniciar sesión: " + e.message;
-    }
-  };
+        document.getElementById('logout-btn').addEventListener('click', async () => {
+            await signOut(auth);
+            window.location.href = 'login.html';
+        });
 
-  window.cerrarSesion = function () { signOut(auth); };
+        let registroActual = null;
+        let urlQRActual = '';
 
-  onAuthStateChanged(auth, (user) => {
-    if (user) {
-      document.getElementById('login').style.display = 'none';
-      document.getElementById('app').style.display = 'block';
-      document.getElementById('usuarioActual').textContent = user.email;
-    } else {
-      document.getElementById('login').style.display = 'block';
-      document.getElementById('app').style.display = 'none';
-    }
-  });
+        window.actualizarFormularioDatos = function() {
+            const contenedor = document.getElementById('contenedor-inputs-dinamicos');
+            const inputsEditor = document.querySelectorAll('#lista-campos-editor input');
+            contenedor.innerHTML = '';
+            inputsEditor.forEach((input, index) => {
+                const nombre = input.value || `Campo ${index + 1}`;
+                contenedor.innerHTML += `
+                    <div class="form-group">
+                        <label>${nombre}</label>
+                        <input type="text" class="campo-valor" data-nombre="${nombre}" placeholder="Ingrese ${nombre.toLowerCase()}">
+                    </div>
+                `;
+            });
+        }
 
-  // ---- Campos dinámicos ----
-  const camposIniciales = [
-    ["Nombre", ""], ["CURP", ""], ["Escuela", ""], ["CCT", ""],
-    ["Promedio", ""], ["Lugar", ""], ["Fecha de expedición", ""]
-  ];
+        window.agregarNuevoCampo = function() {
+            document.getElementById('lista-campos-editor').innerHTML += `
+                <div class="campo-row">
+                    <input type="text" value="Nuevo Campo" oninput="actualizarFormularioDatos()">
+                    <button class="btn-danger" onclick="this.parentElement.remove(); actualizarFormularioDatos();">X</button>
+                </div>
+            `;
+            actualizarFormularioDatos();
+        }
 
-  function agregarCampo(nombre = "", valor = "") {
-    const cont = document.getElementById('camposContainer');
-    const row = document.createElement('div');
-    row.className = 'campo-row';
-    row.innerHTML = `
-      <input type="text" placeholder="Nombre del campo" class="campoNombre" value="${nombre}">
-      <input type="text" placeholder="Valor" class="campoValor" value="${valor}">
-      <button onclick="this.parentElement.remove()">✕</button>`;
-    cont.appendChild(row);
-  }
-  window.agregarCampo = agregarCampo;
-  camposIniciales.forEach(([n, v]) => agregarCampo(n, v));
+        function generarFolioUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
 
-  // ---- Formato de fecha tipo "21-07-2026 08:30:44 pm" ----
-  function formatearTimbrado(fechaISO) {
-    const d = new Date(fechaISO);
-    const pad = n => String(n).padStart(2, "0");
-    let horas = d.getHours();
-    const ampm = horas >= 12 ? "pm" : "am";
-    horas = horas % 12 || 12;
-    return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(horas)}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${ampm}`;
-  }
+        function generarSelloLargo() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+            let res = '';
+            for (let i = 0; i < 256; i++) res += chars.charAt(Math.floor(Math.random() * chars.length));
+            return res + '==';
+        }
 
-  // ---- Folio ----
-  function bloqueAleatorio(longitud) {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    let out = "";
-    const random = new Uint32Array(longitud);
-    crypto.getRandomValues(random);
-    for (let i = 0; i < longitud; i++) out += chars[random[i] % chars.length];
-    return out;
-  }
-  function generarFolio() {
-    return [8, 4, 4, 4, 12].map(bloqueAleatorio).join("-");
-  }
+        window.guardarYGenerarRegistro = async function() {
+            const inputs = document.querySelectorAll('.campo-valor');
+            const datos = {};
+            inputs.forEach(inp => { datos[inp.getAttribute('data-nombre')] = inp.value || 'N/A'; });
 
-  // ---- Sello digital (SHA-512 sobre folio + campos ordenados) ----
-  async function generarSello(folio, campos) {
-    const claves = Object.keys(campos).sort();
-    const cadena = folio + "|" + claves.map(k => `${k}=${campos[k]}`).join("|");
-    const buffer = await crypto.subtle.digest("SHA-512", new TextEncoder().encode(cadena));
-    return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, "0")).join("");
-  }
+            const folio = generarFolioUUID();
+            const sello = generarSelloLargo();
+            const ahora = new Date();
+            const fechaHora = ahora.toLocaleDateString('es-MX') + ' ' + ahora.toLocaleTimeString('es-MX');
 
-  window.generarDocumento = async function () {
-    const filas = document.querySelectorAll('.campo-row');
-    const campos = {};
-    filas.forEach(row => {
-      const k = row.querySelector('.campoNombre').value.trim();
-      const v = row.querySelector('.campoValor').value.trim();
-      if (k) campos[k] = v;
-    });
-    if (Object.keys(campos).length === 0) {
-      alert("Agrega al menos un campo.");
-      return;
-    }
+            try {
+                // Guardar en Firestore para que la validación pública lo encuentre
+                await addDoc(collection(db, 'registros'), {
+                    folio: folio,
+                    datos: datos,
+                    selloDigital: sello,
+                    fechaHora: fechaHora,
+                    timestamp: serverTimestamp()
+                });
 
-    // Validación de formato (solo estructura, no verifica existencia real)
-    const regexCURP = /^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/;
-    const regexRFC = /^[A-Z&Ñ]{3,4}\d{6}[A-Z0-9]{3}$/;
-    for (const [k, v] of Object.entries(campos)) {
-      const nombre = k.toUpperCase();
-      const valor = v.toUpperCase();
-      if (nombre.includes("CURP") && !regexCURP.test(valor)) {
-        alert(`El campo "${k}" no tiene el formato válido de un CURP (18 caracteres, ej. AAAA000000HAAAAA00).`);
-        return;
-      }
-      if (nombre.includes("RFC") && !regexRFC.test(valor)) {
-        alert(`El campo "${k}" no tiene el formato válido de un RFC (12 o 13 caracteres, ej. AAAA000000AAA).`);
-        return;
-      }
-    }
+                registroActual = { folio, datos, sello, fechaHora };
+                
+                // URL que abrirá el QR (apunta a tu página de validación pública)
+                const urlValidacion = `${window.location.origin}/validar.html?folio=${folio}`;
+                urlQRActual = "https://siged-validacion.github.io/Certificadoelectronico-/";
+              
+                document.getElementById('lbl-folio').textContent = folio;
+                document.getElementById('lbl-fecha').textContent = fechaHora;
+                document.getElementById('lbl-sello').textContent = sello;
+                document.getElementById('qr-img-render').innerHTML = `<img src="${urlQRActual}" alt="QR">`;
+                document.getElementById('resultado-gen').classList.remove('hidden');
 
-    const folio = generarFolio();
-    const sello = await generarSello(folio, campos);
-    const fechaCreacion = new Date().toISOString();
+                alert('¡Registro guardado exitosamente en Firebase!');
+            } catch (error) {
+                alert('Error al guardar en Firebase: ' + error.message);
+            }
+        }
 
-    try {
-      await set(ref(db, `documentos/${folio}`), {
-        folio, campos, sello, fechaCreacion
-      });
-    } catch (e) {
-      alert("Error al guardar en la base de datos: " + e.message);
-      return;
-    }
+        window.descargarQR = function() {
+            if (!urlQRActual) return;
+            const a = document.createElement('a');
+            a.href = urlQRActual;
+            a.download = `QR-${registroActual.folio}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
 
-    const urlValidacion = `${URL_VALIDACION}?folio=${encodeURIComponent(folio)}`;
+        window.copiarPortapapeles = function() {
+            navigator.clipboard.writeText(`Folio: ${registroActual.folio}\nFecha: ${registroActual.fechaHora}\nSello: ${registroActual.sello}`);
+            alert('¡Información copiada al portapapeles!');
+        }
 
-    document.getElementById('outFolio').textContent = folio;
-    document.getElementById('outSello').textContent = sello;
-    document.getElementById('outFecha').textContent = formatearTimbrado(fechaCreacion);
-    document.getElementById('outURL').textContent = urlValidacion;
-    document.getElementById('outURL').href = urlValidacion;
-    document.getElementById('resultado').style.display = 'block';
-
-    generarImagenQR(urlValidacion);
-  };
-
-  function generarImagenQR(texto) {
-    const img = document.getElementById('outQR');
-    if (typeof QRCode === 'undefined') {
-      // La librería no cargó de la fuente principal: intenta una fuente alterna
-      const script = document.createElement('script');
-      script.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
-      script.onload = () => generarImagenQRAlterna(texto);
-      script.onerror = () => { img.replaceWith(Object.assign(document.createElement('p'), {textContent: 'No se pudo cargar el generador de QR. Revisa tu conexión a internet.'})); };
-      document.head.appendChild(script);
-      return;
-    }
-    QRCode.toDataURL(texto, { width: 220 }, (err, url) => {
-      if (err) {
-        img.replaceWith(Object.assign(document.createElement('p'), {textContent: 'Error al generar el QR: ' + err.message}));
-      } else {
-        img.src = url;
-        const enlace = document.getElementById('outDescargarQR');
-        enlace.href = url;
-        enlace.download = `qr-${document.getElementById('outFolio').textContent}.png`;
-      }
-    });
-  }
-
-  function generarImagenQRAlterna(texto) {
-    // qrcodejs (davidshimjs) genera un <canvas>/<img> dentro de un div, no una URL directa
-    const cont = document.createElement('div');
-    document.getElementById('outQR').replaceWith(cont);
-    new QRCode(cont, { text: texto, width: 220, height: 220 });
-    setTimeout(() => {
-      const canvas = cont.querySelector('canvas');
-      if (canvas) {
-        const enlace = document.getElementById('outDescargarQR');
-        enlace.href = canvas.toDataURL('image/png');
-        enlace.download = `qr-${document.getElementById('outFolio').textContent}.png`;
-      }
-    }, 300);
-  }
-</script>
+        actualizarFormularioDatos();
+    </script>
 </body>
 </html>
