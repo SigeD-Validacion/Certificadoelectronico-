@@ -13,7 +13,7 @@ Ya **no se necesitan** `login.html` ni `config.js` — el login y la configuraci
 
 1. En `generador.html`, defines los campos que quieras (Nombre, CURP, Escuela, Promedio, etc. — los que necesites, puedes agregar o quitar).
 2. Al generar, se crea:
-   - **Folio**: identificador único de 36 caracteres en bloques (ej. `A8k3Fp2Q-9zXe-h4Wn-Ty7L-Rk2mVb9QxLpZm`)
+   - **Folio**: identificador único de 36 caracteres en bloques (ej. `AIzaSyDzAId7SfCUZp0kcHlx9CVOmUF7Cvu8wCI`)
    - **Sello digital**: 256 caracteres, calculado con SHA-512 a partir del folio y los campos — si alguien altera un dato guardado, el sello ya no coincide.
    - **Fecha y hora de timbrado**
    - **Código QR** que apunta a la URL de validación con el folio.
@@ -22,9 +22,9 @@ Ya **no se necesitan** `login.html` ni `config.js` — el login y la configuraci
 
 ## Configuración actual
 
-- **Firebase (Realtime Database)**: proyecto `certificado-validacion`, base en `https://certificado-validacion-default-rtdb.firebaseio.com`
+- **Firebase (Realtime Database)**: proyecto `Certificadoelectronico-`, base en `https://certificadoelectronico-89f1e-default-rtdb.firebaseio.com/`
 - **Reglas**: lectura pública en `documentos/`, escritura solo con usuario autenticado (Firebase Authentication, correo/contraseña)
-- **GitHub Pages**: `https://sigedvalidacion.github.io/SigedCertificado-Validacion/`
+- **GitHub Pages**: `https://sigedvalidacion.github.io/Certificadoelectronico-/`
   - Generador: `.../generador.html`
   - Validación: `.../validar.html?folio=...`
 
