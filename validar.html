@@ -58,19 +58,11 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-        import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.0/firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyCrLDSRloFeTdoJFT8hahdbMfCP468NDIw",
-  authDomain: "certificadoelectronico-89f1e.firebaseapp.com",
-  projectId: "certificadoelectronico-89f1e",
-  storageBucket: "certificadoelectronico-89f1e.firebasestorage.app",
-  messagingSenderId: "1071784580481",
-  appId: "1:1071784580481:web:4d53c299ef597acf6f0480"
-        };
+        import { getDatabase, ref, query, orderByChild, equalTo, get } from "https://www.gstatic.com/firebasejs/10.7.0/database.js";
+        import { firebaseConfig } from "./config.js";
 
         const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
+        const db = getDatabase(app);
 
         async function validar() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -83,16 +75,22 @@
             }
 
             try {
-                const q = query(collection(db, 'registros'), where('folio', '==', folio));
-                const snapshot = await getDocs(q);
+                const registrosRef = ref(db, 'registros');
+                const q = query(registrosRef, orderByChild('folio'), equalTo(folio));
+                const snapshot = await get(q);
 
-                if (snapshot.empty) {
+                if (!snapshot.exists()) {
                     document.getElementById('loading').classList.add('hidden');
                     document.getElementById('error-box').classList.remove('hidden');
                     return;
                 }
 
-                const docData = snapshot.docs[0].data();
+                // Obtener el primer registro que coincida
+                let docData = null;
+                snapshot.forEach((childSnapshot) => {
+                    docData = childSnapshot.val();
+                });
+
                 const container = document.getElementById('datos-container');
                 container.innerHTML = '';
 
